@@ -1,49 +1,53 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
 from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
+from awsglue.job import Job
+from awsglue import DynamicFrame
 
-# Initialize Spark and Glue Contexts
-spark = SparkSession.builder \
-    .appName("Aggregate Step Trainer and Accelerometer Data") \
-    .getOrCreate()
-glueContext = GlueContext(spark)
+def sparkSqlQuery(glueContext, query, mapping, transformation_ctx) -> DynamicFrame:
+    for alias, frame in mapping.items():
+        frame.toDF().createOrReplaceTempView(alias)
+    result = spark.sql(query)
+    return DynamicFrame.fromDF(result, glueContext, transformation_ctx)
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
 
-# Load Trusted Step Trainer Data
-s3_bucket_step_trainer_trusted = "s3://path-to-trusted-zone/step_trainer_trusted/"
-step_trainer_trusted_df = spark.read.parquet(s3_bucket_step_trainer_trusted)
+# Script generated for node accelerometer_trusted
+accelerometer_trusted_node1719086370653 = glueContext.create_dynamic_frame.from_catalog(database="stedi", table_name="accelerometer_trusted", transformation_ctx="accelerometer_trusted_node1719086370653")
 
-# Load Trusted Accelerometer Data
-s3_bucket_accelerometer_trusted = "s3://path-to-trusted-zone/accelerometer_trusted/"
-accelerometer_trusted_df = spark.read.parquet(s3_bucket_accelerometer_trusted)
+# Script generated for node customers_curated
+customers_curated_node1719086370042 = glueContext.create_dynamic_frame.from_catalog(database="stedi", table_name="customers_curated", transformation_ctx="customers_curated_node1719086370042")
 
-# Join the data on the condition of matching serial number/user and close timestamps
-aggregated_df = step_trainer_trusted_df.join(
-    accelerometer_trusted_df,
-    (step_trainer_trusted_df.serialNumber == accelerometer_trusted_df.user) &
-    (abs(step_trainer_trusted_df.sensorReadingTime.cast("long") - accelerometer_trusted_df.timeStamp.cast("long")) <= 5)
-)
+# Script generated for node step_trainer_trusted
+step_trainer_trusted_node1719086371042 = glueContext.create_dynamic_frame.from_catalog(database="stedi", table_name="step_trainer_trusted", transformation_ctx="step_trainer_trusted_node1719086371042")
 
-# Select relevant columns and potentially create new features or transformations
-aggregated_df = aggregated_df.select(
-    step_trainer_trusted_df.sensorReadingTime,
-    step_trainer_trusted_df.serialNumber,
-    step_trainer_trusted_df.distanceFromObject,
-    accelerometer_trusted_df.x,
-    accelerometer_trusted_df.y,
-    accelerometer_trusted_df.z
-)
+# Script generated for node SQL Query
+SqlQuery0 = '''
+SELECT 
+    s.sensorReadingTime,
+    s.serialNumber as stepTrainerSerialNumber,
+    s.distanceFromObject,
+    a.user as email,
+    a.timeStamp as accelerometerTimeStamp,
+    a.x,
+    a.y,
+    a.z
+FROM 
+    step_trainer_trusted s
+JOIN 
+    accelerometer_trusted a ON s.sensorReadingTime = a.timeStamp
+JOIN 
+    customers_curated c ON s.serialNumber = c.serialnumber
+'''
+SQLQuery_node1719086409736 = sparkSqlQuery(glueContext, query = SqlQuery0, mapping = {"step_trainer_trusted":step_trainer_trusted_node1719086371042, "accelerometer_trusted":accelerometer_trusted_node1719086370653, "customers_curated":customers_curated_node1719086370042}, transformation_ctx = "SQLQuery_node1719086409736")
 
-# Create a DynamicFrame
-machine_learning_curated_dyf = DynamicFrame.fromDF(aggregated_df, glueContext, "machine_learning_curated_dyf")
+# Script generated for node ml_curated
+ml_curated_node1719086455134 = glueContext.write_dynamic_frame.from_catalog(frame=SQLQuery_node1719086409736, database="stedi", table_name="machine_learning_curated", transformation_ctx="ml_curated_node1719086455134")
 
-# Write to AWS Glue Catalog in the Curated Zone
-glueContext.write_dynamic_frame.from_options(
-    frame = machine_learning_curated_dyf,
-    connection_type = "s3",
-    connection_options = {"path": "s3://path-to-curated-zone/machine_learning_curated"},
-    format = "parquet"
-)
-
-# Log success
-print("Machine learning curated data table created and stored successfully.")
+job.commit()
