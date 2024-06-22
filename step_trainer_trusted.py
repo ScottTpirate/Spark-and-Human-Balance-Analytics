@@ -1,39 +1,29 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
 from awsglue.context import GlueContext
+from awsglue.job import Job
 from awsglue.dynamicframe import DynamicFrame
 
-# Initialize Spark and Glue Contexts
-spark = SparkSession.builder \
-    .appName("Process Step Trainer IoT Data") \
-    .getOrCreate()
-glueContext = GlueContext(spark)
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
 
-# Load Step Trainer data from S3
-s3_bucket_path = "s3://cd0030bucket/step_trainer/"
-step_trainer_df = spark.read.json(s3_bucket_path)
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
 
-# Join with trusted customer data to ensure we only process data from customers who consented
-s3_bucket_customer_trusted = "s3://path-to-trusted-zone/customer_trusted/"
-customer_trusted_df = spark.read.parquet(s3_bucket_customer_trusted)
+# Source: Load step trainer data
+step_trainer_source = glueContext.create_dynamic_frame.from_catalog(database = "your_database_name", table_name = "step_trainer_landing", transformation_ctx = "step_trainer_source")
 
-# Join on serial number and filter records based on customer consent
-trusted_step_trainer_df = step_trainer_df.join(customer_trusted_df, step_trainer_df.serialNumber == customer_trusted_df.serialnumber) \
-                                         .filter(customer_trusted_df.sharewithresearchasofdate.isNotNull())
+# Source: Load curated customer data
+customer_curated_source = glueContext.create_dynamic_frame.from_catalog(database = "your_database_name", table_name = "customer_curated", transformation_ctx = "customer_curated_source")
 
-# Select relevant columns for the step_trainer_trusted table
-trusted_step_trainer_df = trusted_step_trainer_df.select("sensorReadingTime", "serialNumber", "distanceFromObject")
+# Transform: Join step trainer data with curated customer data by serial number
+joined_data = Join.apply(step_trainer_source, customer_curated_source, 'serialNumber', 'serialnumber')
 
-# Create a DynamicFrame
-step_trainer_trusted_dyf = DynamicFrame.fromDF(trusted_step_trainer_df, glueContext, "step_trainer_trusted_dyf")
+# Target: Write data to the curated zone
+datasink = glueContext.write_dynamic_frame.from_options(frame = joined_data, connection_type = "s3", connection_options = {"path": "s3://path-to-curated-zone/step_trainer_curated", "partitionKeys": []}, format = "parquet", format_options = {"mergeSchema": "true"}, transformation_ctx = "datasink")
 
-# Write to AWS Glue Catalog in the Trusted Zone
-glueContext.write_dynamic_frame.from_options(
-    frame = step_trainer_trusted_dyf,
-    connection_type = "s3",
-    connection_options = {"path": "s3://path-to-trusted-zone/step_trainer_trusted"},
-    format = "parquet"
-)
-
-# Log success
-print("Step Trainer trusted data table created and stored successfully.")
+job.commit()

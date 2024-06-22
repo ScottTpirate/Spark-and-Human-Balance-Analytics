@@ -5,5 +5,10 @@ CREATE EXTERNAL TABLE IF NOT EXISTS accelerometer_landing (
     y FLOAT,
     z FLOAT
 )
-STORED AS PARQUET
-LOCATION 's3://path-to-landing-zone/accelerometer_landing/';
+ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+WITH SERDEPROPERTIES (
+  'serialization.format' = '1'
+)
+STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'
+OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+LOCATION 's3://billybob-s3-scott-udacity/accelerometer/landing/';

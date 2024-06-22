@@ -1,14 +1,19 @@
 CREATE EXTERNAL TABLE IF NOT EXISTS customer_landing (
     serialnumber STRING,
-    sharewithpublicasofdate DATE,
-    birthday DATE,
-    registrationdate DATE,
-    sharewithresearchasofdate DATE,
+    sharewithpublicasofdate BIGINT,
+    birthday STRING,
+    registrationdate BIGINT,
+    sharewithresearchasofdate BIGINT,
     customername STRING,
     email STRING,
-    lastupdatedate DATE,
+    lastupdatedate BIGINT,
     phone STRING,
-    sharewithfriendsasofdate DATE
+    sharewithfriendsasofdate BIGINT
 )
-STORED AS PARQUET
-LOCATION 's3://path-to-landing-zone/customer_landing/';
+ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+WITH SERDEPROPERTIES (
+  'serialization.format' = '1'
+)
+STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'
+OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+LOCATION 's3://billybob-s3-scott-udacity/customer/landing/';

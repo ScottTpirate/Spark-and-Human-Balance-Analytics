@@ -1,31 +1,47 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
 from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
+from awsglue.job import Job
+from awsglue import DynamicFrame
 
-# Initialize Spark and Glue Contexts
-spark = SparkSession.builder \
-    .appName("Sanitize Accelerometer Data") \
-    .getOrCreate()
-glueContext = GlueContext(spark)
+def sparkSqlQuery(glueContext, query, mapping, transformation_ctx) -> DynamicFrame:
+    for alias, frame in mapping.items():
+        frame.toDF().createOrReplaceTempView(alias)
+    result = spark.sql(query)
+    return DynamicFrame.fromDF(result, glueContext, transformation_ctx)
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
 
-# Load data from S3
-s3_bucket_path = "s3://cd0030bucket/accelerometer/"
-accelerometer_df = spark.read.json(s3_bucket_path)
+# Script generated for node accelerometor_landing
+accelerometor_landing_node1719081484967 = glueContext.create_dynamic_frame.from_catalog(database="stedi", table_name="accelerometer_landing", transformation_ctx="accelerometor_landing_node1719081484967")
 
-# Sanitize data: Filter accelerometer readings from customers who agreed to share their data
-accelerometer_trusted_df = accelerometer_df.filter(col("sharewithresearchasofdate").isNotNull())
+# Script generated for node customer_trusted
+customer_trusted_node1719081906979 = glueContext.create_dynamic_frame.from_catalog(database="stedi", table_name="customer_trusted", transformation_ctx="customer_trusted_node1719081906979")
 
-# Create a DynamicFrame
-accelerometer_trusted_dyf = DynamicFrame.fromDF(accelerometer_trusted_df, glueContext, "accelerometer_trusted_dyf")
+# Script generated for node SQL Query
+SqlQuery0 = '''
+SELECT 
+    a.user,
+    a.timestamp,
+    a.x,
+    a.y,
+    a.z
+FROM 
+    accelerometor_landing a
+JOIN 
+    customer_trusted c
+ON 
+    a.user = c.email
+'''
+SQLQuery_node1719081510520 = sparkSqlQuery(glueContext, query = SqlQuery0, mapping = {"accelerometor_landing":accelerometor_landing_node1719081484967, "customer_trusted":customer_trusted_node1719081906979}, transformation_ctx = "SQLQuery_node1719081510520")
 
-# Write to AWS Glue Catalog
-glueContext.write_dynamic_frame.from_options(
-    frame = accelerometer_trusted_dyf,
-    connection_type = "s3",
-    connection_options = {"path": "s3://path-to-trusted-zone/accelerometer_trusted"},
-    format = "parquet"
-)
+# Script generated for node AWS Glue Data Catalog
+AWSGlueDataCatalog_node1719082030194 = glueContext.write_dynamic_frame.from_catalog(frame=SQLQuery_node1719081510520, database="stedi", table_name="accelerometer_trusted", transformation_ctx="AWSGlueDataCatalog_node1719082030194")
 
-# Log success
-print("Accelerometer data sanitized and stored successfully.")
+job.commit()

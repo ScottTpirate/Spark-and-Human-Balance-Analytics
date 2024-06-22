@@ -1,34 +1,33 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
 from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
+from awsglue.job import Job
+from awsglue import DynamicFrame
 
-# Initialize Spark and Glue Contexts
-spark = SparkSession.builder \
-    .appName("Sanitize Customer Data") \
-    .getOrCreate()
-glueContext = GlueContext(spark)
+def sparkSqlQuery(glueContext, query, mapping, transformation_ctx) -> DynamicFrame:
+    for alias, frame in mapping.items():
+        frame.toDF().createOrReplaceTempView(alias)
+    result = spark.sql(query)
+    return DynamicFrame.fromDF(result, glueContext, transformation_ctx)
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
 
-# Load data from S3
-s3_bucket_path = "s3://cd0030bucket/customers/"
-customer_df = spark.read.json(s3_bucket_path)
+# Script generated for node AWS Glue Data Catalog
+AWSGlueDataCatalog_node1719080617387 = glueContext.create_dynamic_frame.from_catalog(database="stedi", table_name="customer_landing", transformation_ctx="AWSGlueDataCatalog_node1719080617387")
 
-# Sanitize data: Select customers who have agreed to share their data for research
-customer_trusted_df = customer_df.filter(col("sharewithresearchasofdate").isNotNull())
+# Script generated for node SQL Query
+SqlQuery0 = '''
+select * from myDataSource where shareWithResearchAsOfDate is not null
+'''
+SQLQuery_node1719081056235 = sparkSqlQuery(glueContext, query = SqlQuery0, mapping = {"myDataSource":AWSGlueDataCatalog_node1719080617387}, transformation_ctx = "SQLQuery_node1719081056235")
 
-# Convert date strings to date type if necessary
-customer_trusted_df = customer_trusted_df.withColumn("sharewithresearchasofdate", to_date(col("sharewithresearchasofdate")))
+# Script generated for node AWS Glue Data Catalog
+AWSGlueDataCatalog_node1719080913078 = glueContext.write_dynamic_frame.from_catalog(frame=SQLQuery_node1719081056235, database="stedi", table_name="customer_trusted", transformation_ctx="AWSGlueDataCatalog_node1719080913078")
 
-# Create a DynamicFrame
-customer_trusted_dyf = DynamicFrame.fromDF(customer_trusted_df, glueContext, "customer_trusted_dyf")
-
-# Write to AWS Glue Catalog
-glueContext.write_dynamic_frame.from_options(
-    frame=customer_trusted_dyf,
-    connection_type="s3",
-    connection_options={"path": "s3://path-to-trusted-zone/customer_trusted"},
-    format="parquet"
-)
-
-# Log success
-print("Customer data sanitized and stored successfully.")
+job.commit()
