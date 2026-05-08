@@ -1,5 +1,5 @@
 CREATE EXTERNAL TABLE IF NOT EXISTS accelerometer_landing (
-    timeStamp TIMESTAMP,
+    timestamp BIGINT,
     user STRING,
     x FLOAT,
     y FLOAT,
@@ -11,4 +11,4 @@ WITH SERDEPROPERTIES (
 )
 STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-LOCATION 's3://billybob-s3-scott-udacity/accelerometer/landing/';
+LOCATION 's3://scott-wgu-d609/accelerometer/landing/';

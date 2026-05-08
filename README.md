@@ -7,6 +7,8 @@ The STEDI Human Balance Analytics project is designed to analyze sensor data fro
 
 ## Project Structure
 
+This project is configured to use `s3://scott-wgu-d609` for the STEDI starter data and output folders.
+
 ### Landing Zone
 Data is initially ingested from various sources into S3 buckets, categorized into three primary types:
 1. **Customer Data**: Details about the customers.
@@ -43,7 +45,7 @@ Data from the Trusted Zone is further refined and prepared for specific analytic
 ## Key Tables and Their Roles
 - **customer_landing, accelerometer_landing, step_trainer_landing**: Initial raw data tables from various sources.
 - **customer_trusted, accelerometer_trusted, step_trainer_trusted**: Tables containing sanitized data from consenting customers.
-- **customers_curated**: Contains customer data that has both consented to data sharing and has corresponding accelerometer data.
+- **customer_curated**: Contains customer data that has both consented to data sharing and has corresponding accelerometer data.
 - **machine_learning_curated**: Aggregated data combining Step Trainer and Accelerometer data, ready for machine learning purposes.
 
 ## Performance and Optimization Hints

@@ -16,4 +16,4 @@ WITH SERDEPROPERTIES (
 )
 STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-LOCATION 's3://billybob-s3-scott-udacity/customer/landing/';
+LOCATION 's3://scott-wgu-d609/customer/landing/';

@@ -18,6 +18,9 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
+# Replace this with your own S3 bucket before running the Glue job.
+STEDI_BUCKET = "s3://scott-wgu-d609"
+
 # Script generated for node customer_trusted
 customer_trusted_node1719083133576 = glueContext.create_dynamic_frame.from_catalog(database="stedi", table_name="customer_trusted", transformation_ctx="customer_trusted_node1719083133576")
 
@@ -52,7 +55,17 @@ select distinct * from myDataSource
 '''
 distinct_node1719084836773 = sparkSqlQuery(glueContext, query = SqlQuery0, mapping = {"myDataSource":SQLQuery_node1719083815068}, transformation_ctx = "distinct_node1719084836773")
 
-# Script generated for node customers_curated
-customers_curated_node1719083331184 = glueContext.write_dynamic_frame.from_catalog(frame=distinct_node1719084836773, database="stedi", table_name="customers_curated", additional_options={"enableUpdateCatalog": True, "updateBehavior": "UPDATE_IN_DATABASE"}, transformation_ctx="customers_curated_node1719083331184")
+# Script generated for node customer_curated
+customer_curated_sink = glueContext.getSink(
+    path=f"{STEDI_BUCKET}/customer/curated/",
+    connection_type="s3",
+    updateBehavior="UPDATE_IN_DATABASE",
+    partitionKeys=[],
+    enableUpdateCatalog=True,
+    transformation_ctx="customer_curated_sink"
+)
+customer_curated_sink.setCatalogInfo(catalogDatabase="stedi", catalogTableName="customer_curated")
+customer_curated_sink.setFormat("json")
+customer_curated_sink.writeFrame(distinct_node1719084836773)
 
 job.commit()
